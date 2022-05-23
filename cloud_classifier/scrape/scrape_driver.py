@@ -47,6 +47,9 @@ def generate_images_database(image_dict):
             image_title = _image["image_title"][0].replace('"', "").replace(",", ";")
             image_tags = clean_image_tags(_image["image_tags"])
 
+            if isinstance(image_url, str):
+                image_url = image_url.split()[0]
+
             images_df["id"].append(unique_id)
             images_df["url"].append(image_url)
             images_df["title"].append(image_title)
@@ -59,11 +62,18 @@ def generate_images_database(image_dict):
     return images_df
 
 def scaper_main(iterations=5):
+    """
+
+    :param iterations:
+    :return:
+    """
 
     scraper = ExtractFromCloudAppreciationSite()
 
     for i in range(iterations):
-        time.sleep(15)
+        # wait 10 seconds for the page to load, then advance the gallery
+        # at the end of the advancement process, scrape the entire page
+        time.sleep(10)
         print("Iteration {}: Advancing gallery".format(i))
         scraper.advance_gallery()
 
@@ -73,6 +83,13 @@ def scaper_main(iterations=5):
     return image_data
 
 def saver_main(iterations=5):
+    """
+    Use as follows:
+    >from cloud_classifier.cloud_classifier.scrape.scrape_driver import saver_main
+    >saver_main(iterations=20)
+    :param iterations:
+    :return:
+    """
 
     scraped_data = scaper_main(iterations=iterations)
     images_df = generate_images_database(scraped_data)
