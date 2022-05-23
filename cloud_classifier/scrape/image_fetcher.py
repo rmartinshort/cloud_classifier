@@ -41,6 +41,13 @@ class ImageFetcher(object):
         df_to_download = self._select_tags_to_classify(labels_to_classify)
         self.to_download = df_to_download
 
+    def save_images_to_download_df(self):
+
+        if isinstance(self.to_download, pd.DataFrame):
+            self.to_download.to_csv(
+                os.path.join(IMAGE_PATH, "to_download.csv"),index=False
+            )
+
     def download_images(self):
 
         if isinstance(self.to_download,pd.DataFrame):
