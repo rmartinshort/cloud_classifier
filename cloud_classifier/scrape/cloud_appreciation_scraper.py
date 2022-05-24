@@ -3,7 +3,7 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import re
 
-from cloud_classifier.cloud_classifier.comon.constants import (
+from cloud_classifier.cloud_classifier.common.constants import (
     GALLERY_URL,
     CHROMEDRIVER_PATH
 )

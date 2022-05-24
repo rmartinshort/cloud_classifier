@@ -1,7 +1,7 @@
 from cloud_classifier.cloud_classifier.scrape.cloud_appreciation_scraper import (
     ExtractFromCloudAppreciationSite
 )
-from cloud_classifier.cloud_classifier.comon.constants import METADATA_PATH
+from cloud_classifier.cloud_classifier.common.constants import METADATA_PATH
 import time
 import uuid
 import pandas as pd

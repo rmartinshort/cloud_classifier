@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import requests # request img from web
 import shutil # save img locally
-from cloud_classifier.cloud_classifier.comon.constants import (
+from cloud_classifier.cloud_classifier.common.constants import (
     METADATA_PATH,
     IMAGE_PATH,
     scrape_tags_to_remove
