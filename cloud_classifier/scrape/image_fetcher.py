@@ -9,6 +9,27 @@ from cloud_classifier.cloud_classifier.common.constants import (
 )
 
 
+def other_tag_logic(tag_list):
+    """
+    # Remove all other tags. If an image only contains other,
+    its classification tags will just be an empty list
+    :param tag_list:
+    :return:
+    """
+    return [t for t in tag_list if t != "other"]
+
+
+def remove_other_tags(df):
+    """
+    Remove tags with "other" label, since these will be represented with
+    a list of zeros for each class
+    :param df:
+    :return:
+    """
+    df["tags"] = df["tags"].apply(lambda x: other_tag_logic(x))
+    return df
+
+
 def download_image_from_url(url, file_name):
     """
 
@@ -33,10 +54,10 @@ class ImageFetcher(object):
         self.metadata_df = self._load_metadata()
         self.to_download = None
 
-    def assemble_images_to_download(self):
+    def assemble_images_to_download(self, nkeep=100):
 
         redacted_metadata_df = self._load_metadata()
-        labels_to_classify = self._redact_rare_tags()
+        labels_to_classify = self._redact_rare_tags(nkeep)
         print(labels_to_classify)
         df_to_download = self._select_tags_to_classify(labels_to_classify)
         self.to_download = df_to_download
@@ -52,6 +73,8 @@ class ImageFetcher(object):
 
         if isinstance(self.to_download,pd.DataFrame):
             self._download_images()
+        # Save the metadata of the images to be downloaded
+        self.save_images_to_download_df()
 
     def _load_metadata(self):
 
@@ -79,7 +102,7 @@ class ImageFetcher(object):
         labels_to_classify = list(tags_to_classify["tags"].unique())
         return labels_to_classify
 
-    def _select_tags_to_classify(self,labels):
+    def _select_tags_to_classify(self, labels):
 
         df_tags = self.metadata_df.copy()
         df_tags["tags"] = self.metadata_df[
@@ -88,6 +111,8 @@ class ImageFetcher(object):
             lambda x: "other" if x not in labels else x
         )
 
+        print('-------------------------------------------')
+        print("Tags distribution")
         tags_to_display = df_tags.groupby(
             "tags"
         ).agg(
@@ -103,6 +128,26 @@ class ImageFetcher(object):
         final_df = df_tags.groupby(
             ["id", "url", "title"]
         )["tags"].apply(list).reset_index()
+
+        # Remove all the "other" labels
+        final_df = remove_other_tags(final_df)
+        final_df = final_df.reset_index()
+
+        print('-------------------------------------------')
+        print("Tag numbers distribution")
+        tmp = final_df.copy()
+        tmp["ntags"] = tmp["tags"].apply(lambda x: len(x))
+        tmp = tmp.groupby(
+            "ntags"
+        ).agg(
+            {"id": "count"}
+        ).reset_index(
+        ).rename(
+            columns={"id": "count_tags"}
+        ).sort_values(
+            by="count_tags"
+        ).reset_index()
+        print(tmp)
 
         return final_df
 

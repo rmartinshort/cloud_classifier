@@ -150,9 +150,9 @@ def train_model(model,
             epoch_acc = evaluation_metrics(model, inputs, labels)
 
             if phase == "train":
-                train_epoch_loss_history.append(running_loss)
+                train_epoch_loss_history.append(epoch_loss)
             else:
-                valid_epoch_loss_history.append(running_loss)
+                valid_epoch_loss_history.append(epoch_loss)
 
             print('{} Loss: {:.4f}, F1 score: {:4f}'.format(phase, epoch_loss, epoch_acc))
 

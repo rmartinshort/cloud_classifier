@@ -1,6 +1,23 @@
 from sklearn.metrics import precision_score, recall_score, f1_score
 import torch
 import numpy as np
+import torchvision.transforms as transforms
+
+
+def set_transform():
+    transform_pipe = transforms.Compose([
+        transforms.ToPILImage(mode="RGB"),
+        transforms.RandomChoice([
+            transforms.RandomRotation(degrees=(-30, 30)),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5)
+        ]),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.ToTensor()
+    ])
+
+    return transform_pipe
+
 
 def evaluation_metrics(model ,inputs ,labels ,threshold=0.5):
 

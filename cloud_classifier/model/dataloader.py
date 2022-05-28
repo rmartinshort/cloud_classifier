@@ -8,9 +8,10 @@ from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
 from cloud_classifier.cloud_classifier.common.constants import IMAGE_PATH
+from cloud_classifier.cloud_classifier.model.utils import set_transform
 
-def load_metadata(limit=None):
 
+def load_metadata(limit=None, replicate=2):
     metadata_df = pd.read_csv(
         os.path.join(IMAGE_PATH, "to_download.csv"),
         converters={"tags": eval}
@@ -19,7 +20,18 @@ def load_metadata(limit=None):
     if limit:
         metadata_df = metadata_df.sample(limit)
 
-    classes = list(sorted(metadata_df.explode("tags")["tags"].unique().tolist()))
+    classes = list(
+        sorted(
+            metadata_df.explode("tags")["tags"].dropna().unique().tolist()
+        )
+    )
+
+    dfs = []
+    if replicate > 0:
+        for i in range(replicate):
+            dfs.append(metadata_df)
+    metadata_df = pd.concat(dfs).sample(frac=1)
+
     return metadata_df, classes
 
 class ImageDataset(Dataset):
@@ -44,7 +56,8 @@ class ImageDataset(Dataset):
                  train=True,
                  test=False,
                  train_ratio=0.75,
-                 standard_size=(224, 224)
+                 standard_size=(224, 224),
+                 use_augmentation=True
                  ):
 
         self.metadata_csv = csv
@@ -57,7 +70,7 @@ class ImageDataset(Dataset):
         self.train_ratio = int(train_ratio * nrecords)
         self.valid_ratio = nrecords - self.train_ratio
         self.resize_size = standard_size
-        self.classes = list(sorted(self.metadata_csv.explode("tags")["tags"].unique().tolist()))
+        self.classes = list(sorted(self.metadata_csv.explode("tags")["tags"].dropna().unique().tolist()))
 
         # set the training data images and labels
         if self.train == True:
@@ -66,10 +79,14 @@ class ImageDataset(Dataset):
             self.labels = list(self.all_labels[:self.train_ratio])
 
             # define the training transforms
-            self.transform = transforms.Compose([
-                transforms.ToPILImage(mode="RGB"),
-                transforms.ToTensor()
-            ])
+            if use_augmentation:
+                self.transform = set_transform()
+            else:
+                self.transform = transforms.Compose([
+                    transforms.ToPILImage(mode="RGB"),
+                    transforms.ToTensor()
+                ])
+
         # set the validation data images and labels
         elif self.train == False and self.test == False:
             print(f"Number of validation images: {self.valid_ratio}")
@@ -103,8 +120,8 @@ class ImageDataset(Dataset):
         targets = self.encode_label(self.labels[index])
 
         return {
-            'image': torch.tensor(image, dtype=torch.float32),
-            'label': torch.tensor(targets, dtype=torch.float32)
+            'image': image.clone().detach(),
+            'label': targets.clone().detach()
         }
 
     def encode_label(self, label):
@@ -131,10 +148,14 @@ class ImageDataset(Dataset):
         for i, x in enumerate(target):
             if (x >= threshold):
                 result.append(self.classes[i])
+
+        # Case when the image is of something that has not been classified
+        if len(result) == 0:
+            result = ["other"]
         return ','.join(result)
 
 
-def show_batch(dataloader, nmax=16):
+def show_batch(dataset, dataloader, nmax=16):
     for op in dataloader:
         images = op["image"]
         labels = op["label"]
@@ -144,5 +165,5 @@ def show_batch(dataloader, nmax=16):
         ax.set_yticks([])
         ax.imshow(make_grid(images[:nmax], nrow=4, pad_value=50).permute(1, 2, 0))
         for i, lab in enumerate(labels):
-            print("{}, {}".format(i, dataloader.decode_target(lab.numpy())))
+            print("{}, {}".format(i, dataset.decode_target(lab.numpy())))
         break
