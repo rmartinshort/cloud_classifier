@@ -11,9 +11,9 @@ from cloud_classifier.cloud_classifier.common.constants import IMAGE_PATH
 from cloud_classifier.cloud_classifier.model.utils import set_transform
 
 
-def load_metadata(limit=None, replicate=2):
+def load_metadata(limit=None, replicate=2, image_path=IMAGE_PATH):
     metadata_df = pd.read_csv(
-        os.path.join(IMAGE_PATH, "to_download.csv"),
+        os.path.join(image_path, "to_download.csv"),
         converters={"tags": eval}
     )
 

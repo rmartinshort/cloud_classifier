@@ -13,7 +13,8 @@ def set_transform():
             transforms.RandomVerticalFlip(p=0.5)
         ]),
         transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor()
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     return transform_pipe
