@@ -9,7 +9,7 @@ def set_transform():
         transforms.ToPILImage(mode="RGB"),
         transforms.RandomChoice([
             transforms.RandomRotation(degrees=(-30, 30)),
-            transforms.RandomHorizontalFlip(p=0.5)
+            transforms.RandomHorizontalFlip(p=0.2)
         ]),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
