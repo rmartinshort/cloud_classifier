@@ -28,21 +28,31 @@ def baseline_main(params):
 
     epochs = params.get("epochs", 30)
     data_limit = params.get("data_limit", None)
-    batch_size = params.get("batch_size", 8)
-    learning_rate = params.get("learning_rate", 1e-4)
-    torchvision_model = params.get("model_name", "resnet")
+    batch_size = params.get("batch_size", 16)
+    learning_rate = params.get("learning_rate", 5e-4)
+    image_path = params.get("image_path", None)
+    replicate_for_augmentation = params.get("replicate", 3)
+    torchvision_model = params.get("model_name", "resnet18")
 
     # Detect if we have a GPU available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    metadata_df, classes = load_metadata(limit=data_limit)
+    metadata_df, classes = load_metadata(limit=data_limit,
+                                         replicate=replicate_for_augmentation,
+                                         image_path=image_path)
 
     train_data = ImageDataset(
-        metadata_df, train=True, test=False
+        metadata_df,
+        train=True,
+        test=False,
+        use_augmentation=True
     )
 
     valid_data = ImageDataset(
-        metadata_df, train=False, test=False
+        metadata_df,
+        train=False,
+        test=False,
+        use_augmentation=True
     )
 
     # train data loader
@@ -83,7 +93,6 @@ def baseline_main(params):
                                                         dataloaders,
                                                         criterion,
                                                         optimizer,
-                                                        N=len(train_data),
                                                         num_epochs=epochs,
                                                         is_inception=False,
                                                         batch_lim=None

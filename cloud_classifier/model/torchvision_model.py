@@ -1,10 +1,12 @@
 from cloud_classifier.cloud_classifier.model.utils import (
-    evaluation_metrics
+    calculate_number_correct,
+    calculate_validation_accuracy_metrics
 )
 
 import torch
 import time
 import copy
+import numpy as np
 from tqdm import tqdm
 from torchvision import models as models
 import torch.nn as nn
@@ -21,24 +23,42 @@ def set_parameter_requires_grad(model, feature_extracting):
             param.requires_grad = False
 
 
-def initialize_model(model_name, num_classes, feature_extract, use_pretrained=True):
+def initialize_model(model_name,
+                     num_classes,
+                     feature_extract,
+                     use_pretrained=True,
+                     final_dropout=0.2):
     """
     Note that feature extract is bool and set to
     true of we don't want to fine-tune the hidden layers
-    Adapted from https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
     """
 
     model_ft = None
     input_size = 0
 
-    if model_name == "resnet":
-        """ Resnet50
+    if "resnet" in model_name:
+        """ Resnet models
+        See https://pytorch.org/hub/pytorch_vision_resnet/
         """
-        model_ft = models.resnet50(pretrained=use_pretrained)
+        model_size = model_name[-2:]
+        if model_size == "18":
+            model_ft = models.resnet18(pretrained=use_pretrained)
+        elif model_size == "34":
+            model_ft = models.resnet34(pretrained=use_pretrained)
+        elif model_size == "50":
+            model_ft = models.resnet50(pretrained=use_pretrained)
+        else:
+            # Default to resnet 101
+            model_ft = models.resnet101(pretrained=use_pretrained)
+
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.fc.in_features
-        model_ft.fc = nn.Linear(num_ftrs, num_classes)
-        input_size = 224
+
+        # Set the final classification layer to include droput
+        model_ft.fc = nn.Sequential(
+            nn.Dropout(final_dropout),
+            nn.Linear(num_ftrs, num_classes)
+        )
 
     else:
         print("Invalid model name, exiting...")
@@ -51,27 +71,12 @@ def train_model(model,
                 dataloaders,
                 criterion,
                 optimizer,
-                N,
-                device,
                 num_epochs=25,
                 is_inception=False,
-                batch_lim=2):
-    """
-    Main function used to train a torchvision model
-    Adapted from https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
-    and https://debuggercafe.com/multi-label-image-classification-with-pytorch-and-deep-learning/
+                batch_lim=2,
+                threshold=0.5):
 
-    :param model:
-    :param dataloaders:
-    :param criterion:
-    :param optimizer:
-    :param N:
-    :param device:
-    :param num_epochs:
-    :param is_inception:
-    :param batch_lim:
-    :return:
-    """
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     since = time.time()
 
@@ -83,9 +88,10 @@ def train_model(model,
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-        print('-' * 10)
+        print('-' * 20)
 
         # Each epoch has a training and validation phase
+        epoch_valid_predictions = []
         for phase in ['train', 'valid']:
             if phase == 'train':
                 model.train()  # Set model to training mode
@@ -93,12 +99,15 @@ def train_model(model,
                 model.eval()  # Set model to evaluate mode
 
             running_loss = 0.0
+            running_corrects = 0
 
             # Iterate over data.
             # Get the current dataloader
             dataloader = dataloaders[phase]
+            Ndata = len(dataloader.dataset)
+
             # Iterate over batches
-            for i, loaded_data in tqdm(enumerate(dataloader), total=int(N / dataloader.batch_size)):
+            for i, loaded_data in tqdm(enumerate(dataloader), total=int(Ndata / dataloader.batch_size)):
                 inputs = loaded_data["image"]
                 labels = loaded_data["label"]
 
@@ -133,10 +142,24 @@ def train_model(model,
                         outputs = torch.sigmoid(outputs)
                         loss = criterion(outputs, labels)
 
+                    # Get the proportion of the batch that was correctly labelled
+                    # Does array comprision for multilabel problem
+                    op_tmp = outputs.detach().cpu().numpy()
+                    predicted_op = np.where(op_tmp > threshold, 1, 0)
+                    targets = labels.detach().cpu().numpy()
+                    p_correct, n_correct = calculate_number_correct(
+                        predicted_op,
+                        targets
+                    )
+                    running_corrects += n_correct
+
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
+                    else:
+                        # Append the batch predictions if we're in validation mode
+                        epoch_valid_predictions.append((predicted_op, targets))
 
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
@@ -146,15 +169,32 @@ def train_model(model,
                         print("At batch lim = {}".format(batch_lim))
                         break
 
-            epoch_loss = running_loss / len(dataloader.dataset)
-            epoch_acc = evaluation_metrics(model, inputs, labels)
+            # Loss for the epoch
+            epoch_loss = running_loss / Ndata
+
+            # proportion of predictions that were fully correct
+            epoch_acc = running_corrects / Ndata
 
             if phase == "train":
                 train_epoch_loss_history.append(epoch_loss)
             else:
+                # Do final validation calculaton here
+                # Here we calculate accuarcy metrics on the results of the
+                # entire validation set, which has been passed though the model and is
+                # contained in the list epoch_valid_predictions
+                validation_f1 = calculate_validation_accuracy_metrics(epoch_valid_predictions, dataloader.dataset.classes)
                 valid_epoch_loss_history.append(epoch_loss)
+                print("--------------------------------------------")
+                print('Validation overall F1 score: {:.2f}'.format(validation_f1))
+                print("--------------------------------------------")
 
-            print('{} Loss: {:.4f}, F1 score: {:4f}'.format(phase, epoch_loss, epoch_acc))
+            print('{} Loss: {:.2f}, Accuracy: {:.2f}, # corrects: {:.1f}, # inputs: {:.1f}'.format(
+                phase,
+                epoch_loss,
+                epoch_acc,
+                running_corrects,
+                Ndata
+            ))
 
             # deep copy the model
             if phase == 'valid' and epoch_acc > best_acc:
