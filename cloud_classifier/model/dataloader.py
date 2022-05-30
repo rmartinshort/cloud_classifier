@@ -41,7 +41,7 @@ def load_metadata(limit=None, replicate=2, image_path=IMAGE_PATH):
     if replicate > 0:
         for i in range(replicate):
             dfs.append(metadata_df)
-    metadata_df = pd.concat(dfs).sample(frac=1)
+        metadata_df = pd.concat(dfs).sample(frac=1)
 
     return metadata_df, classes
 

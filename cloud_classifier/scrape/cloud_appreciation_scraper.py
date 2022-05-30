@@ -1,7 +1,8 @@
-import requests
-from selenium import webdriver
-from bs4 import BeautifulSoup
 import re
+
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 
 from cloud_classifier.cloud_classifier.common.constants import (
     GALLERY_URL,
@@ -22,8 +23,9 @@ class ExtractFromCloudAppreciationSite(object):
 
         self.driver.get(self.gallery_url)
 
-        self.advance_button = self.driver.find_element_by_xpath(
-            "/html/body/div[2]/div/article/div/div[2]/div[2]/div/a"
+        self.advance_button = self.driver.find_element(
+            by=By.XPATH,
+            value="/html/body/div[2]/div/article/div/div[2]/div[2]/div/a"
         )
         self.image_regex = re.compile(
             'item post3 image*'

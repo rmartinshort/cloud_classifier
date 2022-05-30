@@ -1,7 +1,17 @@
 from cloud_classifier.cloud_classifier.scrape.cloud_appreciation_scraper import (
     ExtractFromCloudAppreciationSite
 )
-from cloud_classifier.cloud_classifier.common.constants import METADATA_PATH
+from cloud_classifier.cloud_classifier.common.constants import (
+    IMAGE_PATH,
+    HOLDOUT_PATH,
+    METADATA_PATH
+)
+from cloud_classifier.cloud_classifier.model.dataloader import (
+    load_metadata
+)
+from cloud_classifier.cloud_classifier.scrape.google_images_scraper import (
+    HoldoutFetcher
+)
 import time
 import uuid
 import pandas as pd
@@ -94,3 +104,40 @@ def saver_main(iterations=5):
     scraped_data = scaper_main(iterations=iterations)
     images_df = generate_images_database(scraped_data)
     images_df.to_csv(METADATA_PATH,index=False)
+
+def holdout_main(
+    holdout_path=HOLDOUT_PATH,
+    train_path=IMAGE_PATH,
+    n_images=10):
+
+    """
+    Use as follows
+    >from cloud_classifier.cloud_classifier.scrape.scrape_driver import holdout_main
+    >holdout_main(n_images=20)
+    :param holdout_path:
+    :param train_path:
+    :param n_images:
+    :return:
+    """
+
+    try:
+        _, cloud_classes = load_metadata(
+            replicate=0,
+            image_path=train_path
+        )
+    except Exception as e:
+        print(e)
+        print("Need to run saver_main() and generate to_download.csv first. "
+              "This generates the dataset that will be used to train the model"
+              )
+    holdout_loader = HoldoutFetcher(
+                cloud_classes,
+                holdout_path=holdout_path
+    )
+
+    holdout_loader.generate_metadata(n_images=n_images)
+    holdout_loader.download_images()
+
+
+
+
